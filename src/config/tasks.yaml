@@ -1,0 +1,43 @@
+planning_task:
+  description: >
+    Create a concise project initiation & planning brief for {project_name} targeting {target_user}.
+    Include: refined problem statement, user personas, primary & secondary use cases, key success metrics,
+    prioritized feature list (Must / Should / Could / Won't this release), high-level architecture outline
+    referencing {tech_stack}, major risks & mitigations, and iteration roadmap (3 milestones).
+  expected_output: >
+    A markdown file with sections: 1. Overview 2. Refined Problem 3. Personas 4. Use Cases 5. Success Metrics
+    6. Prioritized Features Table 7. Architecture Outline 8. Risks & Mitigations 9. Milestone Roadmap.
+  agent: project_manager
+
+design_task:
+  description: >
+    Using the planning brief, produce detailed UX & system design artifacts for {project_name} applying
+    {design_principles}. Provide: information architecture, user journey for primary persona, screen / page map,
+    component inventory (name, purpose, props/state), data model (ER or entity list with relationships),
+    API surface (endpoint table with method, path, purpose, request schema, response schema), and design tokens
+    (color, spacing scale, typography, radius, elevation) optimized for accessibility.
+  expected_output: >
+    A markdown design document with sections: 1. IA 2. User Journey 3. Screen Map 4. Component Inventory
+    5. Data Model 6. API Endpoints 7. Design Tokens 8. Accessibility Notes.
+  agent: designer
+
+implementation_task:
+  description: >
+    Convert the design into an implementation plan focused on {tech_stack}. Provide repository structure,
+    module responsibility map, coding standards, dependency decisions, sequence of implementation steps, CI/CD outline,
+    and sample skeleton code snippets for critical modules (API router, data model, service layer, test example).
+    Ensure alignment with design_system and architecture decisions.
+  expected_output: >
+    A markdown implementation plan with sections: 1. Repo Structure 2. Module Map 3. Coding Standards 4. Dependencies
+    5. Implementation Steps 6. CI/CD Workflow 7. Skeleton Code Snippets 8. Performance & Observability Hooks.
+  agent: coder
+
+testing_task:
+  description: >
+    Produce a comprehensive test strategy derived from the implementation plan. Include test pyramid allocation,
+    risk-based prioritization matrix, test data strategy, critical path scenarios, edge & negative cases, non-functional
+    tests (performance, security, accessibility), and automation plan (what, how, when integrated in pipeline).
+  expected_output: >
+    A markdown report with sections: 1. Strategy Overview 2. Risk Matrix 3. Test Coverage by Layer 4. Test Data Plan
+    5. Critical Scenarios 6. Edge & Negative Cases 7. Non-Functional Tests 8. Automation & Tooling 9. Exit Criteria.
+  agent: tester
