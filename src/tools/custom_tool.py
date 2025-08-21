@@ -1,6 +1,8 @@
 from crewai.tools import BaseTool
 from typing import Type
 from pydantic import BaseModel, Field
+import os
+import pathlib
 
 
 # 1. Requirements Clarifier
@@ -481,6 +483,88 @@ class BugLoggerTool(BaseTool):
             return f"❌ **Bug Logging Error**: {str(e)}"
 
 
+# File I/O Tools
+
+class FileWriteInput(BaseModel):
+    path: str = Field(...,
+                      description="Relative file path to write (inside repo).")
+    content: str = Field(..., description="Full file content to write.")
+    overwrite: bool = Field(
+        True, description="Whether to overwrite if file exists.")
+
+
+class WriteFileTool(BaseTool):
+    name: str = "write_file"
+    description: str = "Writes code/content to a file within the project workspace (safe path restricted)."
+    args_schema: Type[BaseModel] = FileWriteInput
+
+    def _run(self, path: str, content: str, overwrite: bool = True) -> str:
+        base = pathlib.Path(".").resolve()
+        target = (base / path).resolve()
+        if base not in target.parents and target != base:
+            return f"❌ Refused: path escapes workspace ({path})"
+        if target.exists() and not overwrite:
+            return f"⚠️ File exists and overwrite=False: {path}"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(content)
+        return f"✅ Wrote file: {path} ({len(content)} bytes)"
+
+
+class FileReadInput(BaseModel):
+    path: str = Field(..., description="Relative file path to read.")
+
+
+class ReadFileTool(BaseTool):
+    name: str = "read_file"
+    description: str = "Reads and returns file content from the project workspace (size-limited)."
+    args_schema: Type[BaseModel] = FileReadInput
+
+    def _run(self, path: str) -> str:
+        base = pathlib.Path(".").resolve()
+        target = (base / path).resolve()
+        if not target.exists():
+            return f"❌ File not found: {path}"
+        if base not in target.parents and target != base:
+            return f"❌ Refused: path escapes workspace ({path})"
+        data = target.read_text(encoding="utf-8")
+        if len(data) > 8000:
+            return f"📄 File (truncated to 8000 chars):\n{data[:8000]}"
+        return f"📄 File Content:\n{data}"
+
+
+# Architecture Documentation Generator
+
+class ArchitectureDocGeneratorInput(BaseModel):
+    system_name: str = Field(..., description="Name of the system or service.")
+    requirements: str = Field(...,
+                              description="Key functional & non-functional requirements.")
+    tech_stack: str = Field(..., description="Chosen / proposed technologies.")
+    constraints: str | None = Field(
+        None, description="Architecture constraints (scaling, compliance, latency).")
+
+
+class ArchitectureDocGeneratorTool(BaseTool):
+    name: str = "generate_architecture_doc"
+    description: str = "Generates a structured architecture document (context, components, data flow, risks)."
+    args_schema: Type[BaseModel] = ArchitectureDocGeneratorInput
+
+    def _run(self, system_name: str, requirements: str, tech_stack: str, constraints: str | None = None) -> str:
+        return (
+            f"# Architecture Document: {system_name}\n"
+            f"## 1. Overview\n{system_name} addresses: {requirements[:180]}...\n"
+            f"## 2. Tech Stack\n{tech_stack}\n"
+            f"## 3. Context Diagram (Logical)\n- Client → API → Services → DB\n"
+            f"## 4. Core Components\n- API Gateway\n- Auth Service\n- Domain Services\n- Background Workers\n"
+            f"## 5. Data Model (High-Level)\n- Users(id, email, role, created_at)\n- Sessions(id, user_id, token_hash)\n"
+            f"## 6. Data Flow\n1) Request -> Gateway -> Service -> DB -> Response\n"
+            f"## 7. Cross-Cutting Concerns\n- Logging, Metrics, Tracing, Caching, Feature Flags\n"
+            f"## 8. Constraints\n{constraints or 'None specified'}\n"
+            f"## 9. Risks & Mitigations\n- Single point in auth -> add redundancy\n"
+            f"## 10. Open Questions\n- Multi-region?  - Rate limits?\n"
+        )
+
+
 # Registry helper (optional for dynamic loading)
 ALL_TOOLS = [
     # Original tools
@@ -502,4 +586,8 @@ ALL_TOOLS = [
     # Tester tools
     UnitTestRunnerTool(),
     BugLoggerTool(),
+    # File I/O and Architecture tools
+    WriteFileTool(),
+    ReadFileTool(),
+    ArchitectureDocGeneratorTool(),
 ]

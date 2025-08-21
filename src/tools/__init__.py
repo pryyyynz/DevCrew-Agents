@@ -20,6 +20,10 @@ from .custom_tool import (
     # Tester tools
     UnitTestRunnerTool,
     BugLoggerTool,
+    # File I/O and Architecture tools
+    WriteFileTool,
+    ReadFileTool,
+    ArchitectureDocGeneratorTool,
     # Tool registry
     ALL_TOOLS
 )
@@ -47,6 +51,9 @@ __all__ = [
     'SearchDocsTool',
     'UnitTestRunnerTool',
     'BugLoggerTool',
+    'WriteFileTool',
+    'ReadFileTool',
+    'ArchitectureDocGeneratorTool',
     'SharedMemoryTool',
     'MessagePassingTool',
     'KnowledgeStoreTool',

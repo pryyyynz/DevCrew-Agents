@@ -22,6 +22,10 @@ from tools import (
     # Tester tools
     UnitTestRunnerTool,
     BugLoggerTool,
+    # File I/O and Architecture tools
+    WriteFileTool,
+    ReadFileTool,
+    ArchitectureDocGeneratorTool,
     # Communication tools
     SharedMemoryTool,
     MessagePassingTool,
@@ -73,6 +77,7 @@ class DevcrewAgents():
         designer_tools = [
             DesignSystemGeneratorTool(),
             ArchitectureReviewerTool(),
+            ArchitectureDocGeneratorTool(),
             CritiqueTool(),
             RequirementsClarifierTool(),  # To understand requirements for design
             # Communication tools
@@ -93,6 +98,8 @@ class DevcrewAgents():
             CodeQualityAnalyzerTool(),
             ArchitectureReviewerTool(),
             RequirementsClarifierTool(),
+            WriteFileTool(),
+            ReadFileTool(),
             CodeExecutionTool(),
             PackageInstallerTool(),
             SearchDocsTool(),
@@ -115,6 +122,7 @@ class DevcrewAgents():
             CodeQualityAnalyzerTool(),
             UnitTestRunnerTool(),
             BugLoggerTool(),
+            ReadFileTool(),
             # Communication tools
             SharedMemoryTool(),
             MessagePassingTool(),
