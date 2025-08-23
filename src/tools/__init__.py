@@ -17,6 +17,7 @@ from .custom_tool import (
     CodeExecutionTool,
     PackageInstallerTool,
     SearchDocsTool,
+    SandboxCodeTool,  # Add the new tool to imports
     # Tester tools
     UnitTestRunnerTool,
     BugLoggerTool,
@@ -49,6 +50,7 @@ __all__ = [
     'CodeExecutionTool',
     'PackageInstallerTool',
     'SearchDocsTool',
+    'SandboxCodeTool',  # Add the new tool to exports
     'UnitTestRunnerTool',
     'BugLoggerTool',
     'WriteFileTool',
