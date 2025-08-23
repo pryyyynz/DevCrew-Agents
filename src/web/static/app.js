@@ -228,6 +228,15 @@ class DevCrewWebInterface {
             e.preventDefault();
             document.getElementById('messageInput').focus();
         }
+
+        // Ctrl/Cmd + Enter to run code in sandbox
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            const sandboxEditor = document.getElementById('sandboxEditor');
+            if (sandboxEditor && document.activeElement === sandboxEditor) {
+                e.preventDefault();
+                this.runSandboxCode();
+            }
+        }
     }
 
     handleQuickAction (e) {
@@ -829,8 +838,12 @@ class DevCrewWebInterface {
     async runSandboxCode () {
         const editor = document.getElementById('sandboxEditor');
         const output = document.getElementById('sandboxOutput');
-        const runBtn = document.getElementById('runCodeBtn');
         const activeTab = document.querySelector('.lang-tab.active');
+
+        if (!editor || !output) {
+            console.error('Sandbox elements not found');
+            return;
+        }
 
         const code = editor.value.trim();
         if (!code) {
@@ -840,11 +853,23 @@ class DevCrewWebInterface {
 
         const language = activeTab ? activeTab.dataset.lang : 'python';
 
-        // Show running state - use the correct container class
+        // Show running state
         const previewContainer = document.querySelector('.preview-container');
-        previewContainer.classList.add('preview-running');
+        if (previewContainer) {
+            previewContainer.classList.add('preview-running');
+        }
+
+        // Update run button to show loading state
+        const runBtn = document.getElementById('runCodeBtn');
+        if (runBtn) {
+            const originalText = runBtn.innerHTML;
+            runBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Running...';
+            runBtn.disabled = true;
+        }
 
         try {
+            console.log(`Executing ${ language } code:`, code.substring(0, 50) + '...');
+
             const response = await fetch('/api/execute-code', {
                 method: 'POST',
                 headers: {
@@ -856,18 +881,31 @@ class DevCrewWebInterface {
                 })
             });
 
-            const result = await response.json();
+            console.log('Response status:', response.status);
 
-            if (response.ok) {
-                this.displaySandboxOutput(result.output || result.message, 'success');
+            const result = await response.json();
+            console.log('Execution result:', result);
+
+            if (response.ok && result.status === 'success') {
+                const output = result.output || result.message || '(No output)';
+                this.displaySandboxOutput(output, 'success');
             } else {
-                this.displaySandboxOutput(result.error || 'Execution failed', 'error');
+                const error = result.error || result.message || 'Execution failed';
+                this.displaySandboxOutput(error, 'error');
             }
         } catch (error) {
+            console.error('Network error:', error);
             this.displaySandboxOutput(`Network error: ${ error.message }`, 'error');
         } finally {
-            // Remove running state
-            previewContainer.classList.remove('preview-running');
+            // Remove running state and restore button
+            if (previewContainer) {
+                previewContainer.classList.remove('preview-running');
+            }
+
+            if (runBtn) {
+                runBtn.innerHTML = '<i class="fas fa-play"></i> <span>Run</span>';
+                runBtn.disabled = false;
+            }
         }
     }
 
@@ -1518,9 +1556,37 @@ console.log("Project:", data);`,
                 const currentCode = editor.value.trim();
                 const newCode = codeData.code.trim();
 
-                // Only update if the code is different and not empty
-                if (newCode && newCode !== currentCode && newCode !== this.getDefaultCode(codeData.language)) {
+                // Check if we should force clear the sandbox before displaying new code
+                const forceClear = codeData.force_clear === true;
+
+                // Enhanced detection: Check if the code is different from current content
+                // Prioritize any generated code over default templates
+                const isNewCode = newCode && (
+                    forceClear ||
+                    newCode !== currentCode || // Different from current editor content
+                    (currentCode === this.getDefaultCode(codeData.language)) // Current content is just template
+                );
+
+                // Additional check: Only filter out actual template examples (not user-generated content)
+                const isActualTemplate = newCode === this.getDefaultCode(codeData.language) ||
+                    newCode.includes('# Example Python code\nprint("Hello from DevCrew Sandbox!")');
+
+                if (isNewCode && !isActualTemplate) {
                     this.loadGeneratedCodeIntoSandbox(codeData);
+
+                    // Auto-focus sandbox if code was generated from user input
+                    if (codeData.description && (
+                        codeData.description.includes('user') ||
+                        codeData.description.includes('request') ||
+                        codeData.description.includes('task') ||
+                        codeData.agent === 'coder' ||
+                        codeData.agent === 'debug_script'
+                    )) {
+                        // Switch to overview tab to show the sandbox
+                        if (this.currentTab !== 'overview') {
+                            document.querySelector('[data-tab="overview"]').click();
+                        }
+                    }
                 }
             }
         } catch (error) {
