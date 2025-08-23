@@ -6,7 +6,12 @@ authors = [{ name = "Pryyyynz", email = "dugboryeleprince@gmail.com" }]
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "crewai[tools]>=0.165.1,<1.0.0",
-    "chromadb>=0.4.0"
+    "chromadb>=0.4.0",
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "jinja2>=3.1.0",
+    "python-multipart>=0.0.6",
+    "websockets>=12.0"
 ]
 
 [project.scripts]
@@ -15,6 +20,7 @@ run_crew = "src.main:run"
 train = "src.main:train"
 replay = "src.main:replay"
 test = "src.main:test"
+web = "src.main:run_web"
 
 [build-system]
 requires = ["hatchling"]
