@@ -108,6 +108,10 @@ class AgentOrchestrator:
         self.shared_memory = SharedMemoryManager("orchestrator_memory.db")
         self.message_bus = MessageBus("orchestrator_messages.db")
 
+        # Task execution control
+        self.continuous_execution = True
+        self.max_execution_cycles = 50  # Prevent infinite loops
+
         # Setup logging
         self.logger = self._setup_logging()
 
@@ -158,12 +162,22 @@ class AgentOrchestrator:
 
     def _get_tools_for_agent(self, agent_type: str) -> List:
         """Get tools for a specific agent type."""
+        from tools.custom_tool import (
+            RequirementsClarifierTool, ArchitectureReviewerTool, TaskManagerTool,
+            TaskAssignmentTool, KnowledgeBaseSearchTool, SummarizerTool,
+            ArchitectureDocGeneratorTool, DesignSystemGeneratorTool, CritiqueTool,
+            WriteFileTool, ReadFileTool, CodeExecutionTool, CodeQualityAnalyzerTool,
+            PackageInstallerTool, SearchDocsTool, UnitTestRunnerTool,
+            TestCaseGeneratorTool, BugLoggerTool, SandboxCodeTool
+        )
+
         common = [RequirementsClarifierTool()]
 
         if (agent_type == "project_manager"):
             return common + [
                 ArchitectureReviewerTool(),
                 TaskManagerTool(),
+                TaskAssignmentTool(),  # New tool for creating tasks
                 KnowledgeBaseSearchTool(),
                 SummarizerTool()
             ]
@@ -181,7 +195,8 @@ class AgentOrchestrator:
                 CodeExecutionTool(),
                 CodeQualityAnalyzerTool(),
                 PackageInstallerTool(),
-                SearchDocsTool()
+                SearchDocsTool(),
+                SandboxCodeTool()  # Add the new sandbox code tool
             ]
         elif (agent_type == "tester"):
             return common + [
@@ -269,56 +284,42 @@ class AgentOrchestrator:
 
     def _requires_pm_first(self, query: str) -> bool:
         """Determine if query requires PM to act first."""
-        pm_keywords = [
-            "project", "plan", "requirement", "scope", "timeline",
-            "priority", "stakeholder", "milestone", "deliverable",
-            "budget", "resource", "risk", "strategy"
-        ]
-
-        query_lower = query.lower()
-        return any(keyword in query_lower for keyword in pm_keywords)
+        # ALL queries now require PM first for proper workflow
+        return True
 
     def _process_user_query(self, user_query: UserQuery) -> str:
-        """Process user query through agent orchestration."""
+        """Process user query through agent orchestration - PM ALWAYS acts first."""
         try:
-            # Step 1: PM processes the query first (if required)
-            if (user_query.requires_pm_first):
-                pm_task = self._create_pm_query_task(user_query)
-                pm_result = self._execute_single_task(pm_task)
+            # Step 1: PM ALWAYS processes the query first
+            pm_task = self._create_pm_query_task(user_query)
+            pm_result = self._execute_single_task(pm_task)
 
-                if not pm_result:
-                    return f"❌ Failed to process query with Project Manager"
+            if not pm_result:
+                return f"❌ Failed to process query with Project Manager"
 
-                # Analyze PM output to determine next steps
-                next_agents = self._analyze_pm_output_for_next_agents(
-                    pm_result)
+            # Step 2: Execute all tasks until completion
+            # This includes any tasks the PM might create
+            self.execute_continuous_until_complete()
 
-                # Create follow-up tasks based on PM analysis
-                follow_up_tasks = self._create_follow_up_tasks(
-                    user_query, pm_result, next_agents)
+            # Step 3: Get final PM response
+            final_response = pm_result.content
 
-                # Execute follow-up tasks with agent rotation
-                follow_up_results = self._execute_with_rotation(
-                    follow_up_tasks, user_query.context or {})
+            # Check if PM created a final compilation task
+            final_tasks = [task for task in self.completed_tasks.values()
+                           if task.agent_id == "project_manager" and "final_response" in task.task_id]
 
-                # Compile final response
-                response = self._compile_query_response(
-                    user_query, pm_result, follow_up_results)
-
-            else:
-                # Direct processing without PM first
-                tasks = self._create_direct_query_tasks(user_query)
-                results = self._execute_with_rotation(
-                    tasks, user_query.context or {})
-                response = self._compile_direct_response(user_query, results)
+            if final_tasks:
+                # Use the most recent final compilation
+                latest_final = max(final_tasks, key=lambda x: x.timestamp)
+                final_response = latest_final.content
 
             # Store response
-            self.query_responses[user_query.id] = response
+            self.query_responses[user_query.id] = final_response
 
             # Update project phase if needed
             self._check_and_update_project_phase()
 
-            return response
+            return self._format_pm_response(user_query, final_response)
 
         except Exception as e:
             error_msg = f"❌ Error processing user query: {str(e)}"
@@ -342,6 +343,231 @@ class AgentOrchestrator:
             timeout=300,
             created_from_query=user_query.id
         )
+
+    def execute_continuous_until_complete(self, project_inputs: Dict[str, Any] = None) -> Dict[str, AgentOutput]:
+        """Execute all tasks in the queue continuously until completion."""
+        self.logger.info(
+            "Starting continuous execution until all tasks complete")
+        results = {}
+        execution_cycles = 0
+        project_inputs = project_inputs or {}
+
+        while self.task_queue and execution_cycles < self.max_execution_cycles:
+            execution_cycles += 1
+            self.logger.info(
+                f"Execution cycle {execution_cycles}: {len(self.task_queue)} tasks in queue")
+
+            # Get tasks that are ready to execute (dependencies satisfied)
+            ready_tasks = []
+            completed_task_ids = set(self.completed_tasks.keys())
+
+            for task in self.task_queue:
+                if task.id not in completed_task_ids and task.id not in self.failed_tasks:
+                    # Check if all dependencies are satisfied
+                    if all(dep_id in completed_task_ids for dep_id in task.dependencies):
+                        ready_tasks.append(task)
+
+            if not ready_tasks:
+                # No ready tasks - check if we have unsatisfied dependencies
+                remaining_tasks = [t for t in self.task_queue
+                                   if t.id not in completed_task_ids and t.id not in self.failed_tasks]
+
+                if remaining_tasks:
+                    self.logger.warning(
+                        f"No ready tasks but {len(remaining_tasks)} remain - possible circular dependency")
+                    # Execute one task with unsatisfied dependencies to break deadlock
+                    ready_tasks = remaining_tasks[:1]
+                else:
+                    break
+
+            # Execute ready tasks
+            cycle_results = {}
+            for task in ready_tasks:
+                if task.agent_type not in self.agents:
+                    self.logger.error(
+                        f"No agent found for type: {task.agent_type}")
+                    self.failed_tasks[task.id] = f"No agent found for type: {task.agent_type}"
+                    continue
+
+                try:
+                    # Execute the task
+                    result = self._execute_single_task(
+                        task, project_inputs, results)
+                    if result:
+                        cycle_results[task.id] = result
+                        results[task.id] = result
+
+                        # Check if this task completion triggers new tasks
+                        self._check_for_triggered_events(result)
+
+                        # Check for PM-created tasks in the output
+                        self._check_for_pm_task_assignments(result)
+
+                        # Remove completed task from queue
+                        self.task_queue = [
+                            t for t in self.task_queue if t.id != task.id]
+
+                        self.logger.info(
+                            f"Completed task {task.id} by {task.agent_type}")
+                    else:
+                        # Task failed, remove from queue
+                        self.task_queue = [
+                            t for t in self.task_queue if t.id != task.id]
+
+                except Exception as e:
+                    self.logger.error(
+                        f"Failed to execute task {task.id}: {str(e)}")
+                    self.failed_tasks[task.id] = str(e)
+                    # Remove failed task from queue
+                    self.task_queue = [
+                        t for t in self.task_queue if t.id != task.id]
+
+            # Update project phase after each cycle
+            self._check_and_update_project_phase()
+
+            # Check if project is complete
+            if self.is_project_complete():
+                self.logger.info("Project completed - stopping execution")
+                break
+
+            # Prevent infinite loops
+            if not cycle_results and self.task_queue:
+                self.logger.warning(
+                    "No tasks were executed this cycle but queue is not empty")
+                break
+
+        if execution_cycles >= self.max_execution_cycles:
+            self.logger.warning(
+                f"Reached maximum execution cycles ({self.max_execution_cycles})")
+
+        self.logger.info(
+            f"Continuous execution completed after {execution_cycles} cycles")
+        return results
+
+    def _check_for_pm_task_assignments(self, result: AgentOutput):
+        """Check if PM output contains task assignments for other agents."""
+        if result.agent_id != "project_manager":
+            return
+
+        content = result.content.lower()
+
+        # Check for explicit tool usage pattern (TaskAssignmentTool output)
+        if "task assigned successfully" in content and "task id:" in content:
+            # Extract task details from tool output
+            lines = result.content.split('\n')
+            task_id = None
+            agent_type = None
+            task_title = None
+            task_description = None
+            priority = 5
+            dependencies = []
+
+            for line in lines:
+                line = line.strip()
+                if line.startswith("**Task ID**:"):
+                    task_id = line.split(":", 1)[1].strip()
+                elif line.startswith("**Assigned to**:"):
+                    agent_info = line.split(":", 1)[1].strip().lower()
+                    if "designer" in agent_info:
+                        agent_type = "designer"
+                    elif "coder" in agent_info:
+                        agent_type = "coder"
+                    elif "tester" in agent_info:
+                        agent_type = "tester"
+                elif line.startswith("**Title**:"):
+                    task_title = line.split(":", 1)[1].strip()
+                elif line.startswith("**Priority**:"):
+                    priority_str = line.split(":", 1)[1].strip().split("/")[0]
+                    try:
+                        priority = int(priority_str)
+                    except:
+                        priority = 5
+                elif line.startswith("**Dependencies**:"):
+                    deps_str = line.split(":", 1)[1].strip()
+                    if deps_str and deps_str != "None":
+                        dependencies = [dep.strip()
+                                        for dep in deps_str.split(",")]
+
+            # Extract description from the tool output
+            desc_start = False
+            description_lines = []
+            for line in lines:
+                if line.strip().startswith("**Description**:"):
+                    desc_start = True
+                    continue
+                elif desc_start and line.strip().startswith("The task has been"):
+                    break
+                elif desc_start:
+                    description_lines.append(line)
+
+            if description_lines:
+                task_description = "\n".join(description_lines).strip()
+
+            # Create the actual orchestrator task
+            if agent_type and task_id:
+                new_task = OrchestratorTask(
+                    id=task_id,
+                    description=task_description or f"Execute {agent_type} work as assigned by Project Manager",
+                    agent_type=agent_type,
+                    priority=priority,
+                    # Always depend on PM task that created it
+                    dependencies=dependencies + [result.task_id],
+                    inputs={
+                        "pm_assignment": result.content,
+                        "assigned_by": "project_manager",
+                        "current_phase": self.current_phase.value,
+                        "task_title": task_title
+                    },
+                    timeout=400
+                )
+
+                self.add_task(new_task)
+                self.logger.info(
+                    f"PM created task via tool: {task_id} for {agent_type}")
+                return
+
+        # Fallback: Look for task assignment patterns in PM output (natural language)
+        task_patterns = [
+            ("designer", ["assign.*designer",
+             "designer.*task", "design.*needed", "ui.*task"]),
+            ("coder", ["assign.*coder", "coder.*task",
+             "implement.*task", "coding.*needed"]),
+            ("tester", ["assign.*tester", "tester.*task",
+             "test.*needed", "testing.*task"])
+        ]
+
+        for agent_type, patterns in task_patterns:
+            if any(re.search(pattern, content) for pattern in patterns):
+                # Create a follow-up task for this agent
+                task_id = f"pm_assigned_{agent_type}_{int(datetime.now().timestamp())}"
+
+                # Extract task description from PM output if possible
+                lines = result.content.split('\n')
+                task_description = f"Execute {agent_type} work as assigned by Project Manager"
+
+                # Look for specific task descriptions in PM output
+                for line in lines:
+                    if agent_type in line.lower() and any(word in line.lower() for word in ['task', 'work', 'need', 'should']):
+                        task_description = line.strip()
+                        break
+
+                new_task = OrchestratorTask(
+                    id=task_id,
+                    description=task_description,
+                    agent_type=agent_type,
+                    priority=6,
+                    dependencies=[result.task_id],
+                    inputs={
+                        "pm_assignment": result.content,
+                        "assigned_by": "project_manager",
+                        "current_phase": self.current_phase.value
+                    },
+                    timeout=400
+                )
+
+                self.add_task(new_task)
+                self.logger.info(
+                    f"PM assigned new task to {agent_type}: {task_id}")
 
     def _analyze_pm_output_for_next_agents(self, pm_result: AgentOutput) -> List[str]:
         """Analyze PM output to determine which agents should act next."""
@@ -390,6 +616,7 @@ class AgentOrchestrator:
                 created_from_query=user_query.id
             )
             tasks.append(task)
+
             # Enqueue the task to the orchestrator queue
             self.add_task(task)
 
@@ -851,24 +1078,23 @@ class AgentOrchestrator:
         """Get performance metrics for each agent."""
         performance = {}
 
-        for agent_type in self.agents.keys():
-            agent_tasks = [
-                output for output in self.completed_tasks.values()
-                if output.agent_id == agent_type
-            ]
+        for agent_type in self.model_mapping.keys():
+            # Count tasks completed by each agent
+            agent_tasks = [task for task in self.completed_tasks.values()
+                           if task.agent_id == agent_type]
 
             if agent_tasks:
                 avg_time = sum(
                     task.execution_time for task in agent_tasks) / len(agent_tasks)
-                avg_reasoning_steps = sum(len(task.reasoning_chain)
-                                          for task in agent_tasks) / len(agent_tasks)
+                avg_reasoning = sum(len(task.reasoning_chain)
+                                    for task in agent_tasks) / len(agent_tasks)
                 avg_actions = sum(len(task.actions_taken)
                                   for task in agent_tasks) / len(agent_tasks)
 
                 performance[agent_type] = {
                     'tasks_completed': len(agent_tasks),
                     'avg_execution_time': avg_time,
-                    'avg_reasoning_steps': avg_reasoning_steps,
+                    'avg_reasoning_steps': avg_reasoning,
                     'avg_actions_taken': avg_actions,
                     'model': self.model_mapping.get(agent_type, 'unknown')
                 }
@@ -991,160 +1217,40 @@ class AgentOrchestrator:
             'project_inputs': project_inputs
         }
 
-    def _create_direct_query_tasks(self, user_query: UserQuery) -> List[OrchestratorTask]:
-        """Create tasks for direct query processing (without PM first)."""
-        # Determine which agent should handle this directly
-        query_lower = user_query.query.lower()
+    def _check_for_triggered_events(self, result: AgentOutput):
+        """Check if agent output triggers events requiring other agents."""
+        content = result.content.lower()
 
-        if any(keyword in query_lower for keyword in ["design", "ui", "ux", "mockup", "wireframe"]):
-            agent_type = "designer"
-        elif any(keyword in query_lower for keyword in ["code", "bug", "implement", "function", "api"]):
-            agent_type = "coder"
-        elif any(keyword in query_lower for keyword in ["test", "qa", "quality", "verify"]):
-            agent_type = "tester"
-        else:
-            agent_type = "project_manager"  # Default fallback
+        # Design completion might trigger coder
+        if result.agent_id == "designer" and "design complete" in content:
+            self._create_triggered_task(
+                "coder", "Begin implementation based on completed design", result.task_id)
 
+        # Code completion might trigger tester
+        if result.agent_id == "coder" and "implementation complete" in content:
+            self._create_triggered_task(
+                "tester", "Create test strategy for completed implementation", result.task_id)
+
+        # Test completion might trigger PM for review
+        if result.agent_id == "tester" and "testing complete" in content:
+            self._create_triggered_task(
+                "project_manager", "Review completed testing and project status", result.task_id)
+
+    def _create_triggered_task(self, agent_type: str, description: str, trigger_task_id: str):
+        """Create a new task triggered by another agent's completion."""
         task = OrchestratorTask(
-            id=f"direct_{agent_type}_{user_query.id}",
-            description=f"Handle direct query: {user_query.query}",
+            id=f"triggered_{agent_type}_{int(datetime.now().timestamp())}",
+            description=description,
             agent_type=agent_type,
-            priority=9,
-            dependencies=[],
-            inputs={
-                "user_query": user_query.query,
-                "context": user_query.context,
-                "current_phase": self.current_phase.value,
-                "project_status": self._get_project_status()
-            },
-            timeout=300,
-            created_from_query=user_query.id
+            priority=7,
+            dependencies=[trigger_task_id],
+            inputs={"triggered_by": trigger_task_id,
+                    "current_phase": self.current_phase.value},
+            timeout=300
         )
 
-        # Add task to queue
         self.add_task(task)
-        return [task]
-
-    def _compile_direct_response(self, user_query: UserQuery,
-                                 results: Dict[str, AgentOutput]) -> str:
-        """Compile response for direct query processing."""
-        response_parts = [
-            f"# Direct Response to: {user_query.query}",
-            f"**Processed at:** {datetime.now().isoformat()}",
-            f"**Current Phase:** {self.current_phase.value}",
-            ""
-        ]
-
-        for task_id, output in results.items():
-            agent_name = output.agent_id.replace("_", " ").title()
-            response_parts.extend([
-                f"## {agent_name} Response",
-                output.content,
-                ""
-            ])
-
-        # Add project status
-        status = self._get_project_status()
-        response_parts.extend([
-            "## Project Status",
-            f"- **Phase:** {status['current_phase']}",
-            f"- **Completed Tasks:** {status['completed_tasks']}",
-            f"- **Last Active Agent:** {status['last_agent']}",
-            ""
-        ])
-
-        return "\n".join(response_parts)
-
-    def query_interactive_mode(self) -> None:
-        """Interactive mode for processing user queries."""
-        print("🎭 DevCrew Agents Interactive Query Mode")
-        print("=" * 50)
-        print("Type 'quit' or 'exit' to stop")
-        print("Type 'status' to see project status")
-        print("Type 'help' for more commands")
-        print()
-
-        while True:
-            try:
-                query = input("🤔 Your query: ").strip()
-
-                if not query:
-                    continue
-
-                if query.lower() in ['quit', 'exit']:
-                    print("👋 Goodbye!")
-                    break
-
-                if query.lower() == 'status':
-                    status = self.get_completion_status()
-                    print(f"""
-📊 **Project Status**
-- Phase: {status['current_phase']} ({status['phase_completion']:.1%} complete)
-- Total Tasks: {status['total_tasks_completed']}
-- Queries Processed: {status['user_queries_processed']}
-- Project Complete: {'✅ Yes' if status['is_complete'] else '❌ No'}
-                    """)
-                    continue
-
-                if query.lower() == 'help':
-                    print("""
-🛠️  **Available Commands**
-- status: Show project status
-- agents: Show agent performance
-- history: Show recent agent turns
-- reset: Reset project to initialization
-- quit/exit: Exit interactive mode
-
-📝 **Query Examples**
-- "What's the current project plan?"
-- "Design a user login interface"
-- "Implement user authentication"
-- "Create tests for the API"
-                    """)
-                    continue
-
-                if query.lower() == 'agents':
-                    performance = self._get_agent_performance()
-                    print("\n🤖 **Agent Performance**")
-                    for agent, metrics in performance.items():
-                        print(f"- {agent}: {metrics['tasks_completed']} tasks, "
-                              f"{metrics['avg_execution_time']:.1f}s avg")
-                    continue
-
-                if query.lower() == 'history':
-                    print("\n📜 **Recent Agent Turns**")
-                    for turn in self.agent_turn_history[-5:]:
-                        print(
-                            f"- {turn['agent_type']} ({turn['reason']}) at {turn['timestamp']}")
-                    continue
-
-                if query.lower() == 'reset':
-                    self.current_phase = ProjectPhase.INITIALIZATION
-                    self.completed_tasks.clear()
-                    self.failed_tasks.clear()
-                    self.agent_turn_history.clear()
-                    print("🔄 Project reset to initialization phase")
-                    continue
-
-                # Process the query
-                print(f"\n🔄 Processing query with DevCrew agents...")
-                response = self.handle_user_query(query)
-
-                print("\n" + "="*60)
-                print(response)
-                print("="*60 + "\n")
-
-                # Show completion status if project is complete
-                if self.is_project_complete():
-                    print("🎉 **Project Complete!** All phases finished.")
-                    break
-
-            except KeyboardInterrupt:
-                print("\n👋 Goodbye!")
-                break
-            except Exception as e:
-                print(f"❌ Error: {e}")
-                continue
+        self.logger.info(f"Created triggered task for {agent_type}: {task.id}")
 
     def _determine_turn_reason(self, task: OrchestratorTask) -> AgentTurnReason:
         """Determine the reason for this agent turn."""
@@ -1197,37 +1303,124 @@ class AgentOrchestrator:
         if len(self.agent_turn_history) > 20:
             self.agent_turn_history = self.agent_turn_history[-20:]
 
-    def _check_for_triggered_events(self, result: AgentOutput):
-        """Check if agent output triggers events requiring other agents."""
-        content = result.content.lower()
+    def _format_pm_response(self, user_query: UserQuery, pm_response: str) -> str:
+        """Format the final PM response for the user."""
+        return f"""# DevCrew Project Manager Response
 
-        # Design completion might trigger coder
-        if result.agent_id == "designer" and "design complete" in content:
-            self._create_triggered_task(
-                "coder", "Begin implementation based on completed design", result.task_id)
+**Query:** {user_query.query}
+**Timestamp:** {datetime.now().isoformat()}
+**Project Phase:** {self.current_phase.value}
 
-        # Code completion might trigger tester
-        if result.agent_id == "coder" and "implementation complete" in content:
-            self._create_triggered_task(
-                "tester", "Create test strategy for completed implementation", result.task_id)
+## Response
 
-        # Test completion might trigger PM for review
-        if result.agent_id == "tester" and "testing complete" in content:
-            self._create_triggered_task(
-                "project_manager", "Review completed testing and project status", result.task_id)
+{pm_response}
 
-    def _create_triggered_task(self, agent_type: str, description: str, trigger_task_id: str):
-        """Create a new task triggered by another agent's completion."""
-        task = OrchestratorTask(
-            id=f"triggered_{agent_type}_{int(datetime.now().timestamp())}",
-            description=description,
-            agent_type=agent_type,
-            priority=7,
-            dependencies=[trigger_task_id],
-            inputs={"triggered_by": trigger_task_id,
-                    "current_phase": self.current_phase.value},
-            timeout=300
-        )
+---
+*All team coordination and specialist work has been managed by the Project Manager*"""
 
-        self.add_task(task)
-        self.logger.info(f"Created triggered task for {agent_type}: {task.id}")
+    def query_interactive_mode(self) -> None:
+        """Interactive mode for processing user queries."""
+        print("🎭 DevCrew Agents Interactive Query Mode")
+        print("=" * 50)
+        print("✅ All queries are processed by the Project Manager first")
+        print("📋 Workflow: PM → Designer → PM → Coder → PM → Tester → PM → User")
+        print("Type 'quit' or 'exit' to stop")
+        print("Type 'status' to see project status")
+        print("Type 'help' for more commands")
+        print()
+
+        while True:
+            try:
+                query = input("🤔 Your query (to Project Manager): ").strip()
+
+                if not query:
+                    continue
+
+                if query.lower() in ['quit', 'exit']:
+                    print("👋 Goodbye!")
+                    break
+
+                if query.lower() == 'status':
+                    status = self.get_completion_status()
+                    print(f"""
+📊 **Project Status** (Managed by Project Manager)
+- Phase: {status['current_phase']} ({status['phase_completion']:.1%} complete)
+- Total Tasks: {status['total_tasks_completed']}
+- Queries Processed: {status['user_queries_processed']}
+- Project Complete: {'✅ Yes' if status['is_complete'] else '❌ No'}
+                    """)
+                    continue
+
+                if query.lower() == 'help':
+                    print("""
+🛠️  **Available Commands**
+- status: Show project status
+- agents: Show agent performance
+- history: Show recent agent turns
+- reset: Reset project to initialization
+- quit/exit: Exit interactive mode
+
+📝 **DevCrew Workflow** (PM-Controlled)
+1. 📋 PM receives and analyzes your query
+2. 🎨 PM assigns design work to Designer (if needed)
+3. 📋 PM reviews and forwards design
+4. 👨‍💻 PM assigns coding work to Coder (if needed)  
+5. 📋 PM reviews and forwards implementation
+6. 🧪 PM assigns testing work to Tester (if needed)
+7. 📋 PM validates and responds to you
+
+**Example Queries:**
+- "Create a project plan for a task management app"
+- "Design a user login interface"
+- "Implement user authentication"
+- "Create tests for the API"
+
+*Note: Only the Project Manager communicates directly with you*
+                    """)
+                    continue
+
+                if query.lower() == 'agents':
+                    performance = self._get_agent_performance()
+                    print("\n🤖 **Agent Performance** (Coordinated by PM)")
+                    for agent, metrics in performance.items():
+                        print(f"- {agent}: {metrics['tasks_completed']} tasks, "
+                              f"{metrics['avg_execution_time']:.1f}s avg")
+                    continue
+
+                if query.lower() == 'history':
+                    print("\n📜 **Recent Agent Turns** (PM-Orchestrated)")
+                    for turn in self.agent_turn_history[-5:]:
+                        print(
+                            f"- {turn['agent_type']} ({turn['reason']}) at {turn['timestamp']}")
+                    continue
+
+                if query.lower() == 'reset':
+                    self.current_phase = ProjectPhase.INITIALIZATION
+                    self.completed_tasks.clear()
+                    self.failed_tasks.clear()
+                    self.agent_turn_history.clear()
+                    print(
+                        "🔄 Project reset to initialization phase (PM will coordinate restart)")
+                    continue
+
+                # Process the query
+                print(
+                    f"\n🔄 Project Manager is processing your query and coordinating the team...")
+                response = self.handle_user_query(query)
+
+                print("\n" + "="*60)
+                print(response)
+                print("="*60 + "\n")
+
+                # Show completion status if project is complete
+                if self.is_project_complete():
+                    print(
+                        "🎉 **Project Complete!** All phases finished under PM coordination.")
+                    break
+
+            except KeyboardInterrupt:
+                print("\n👋 Goodbye!")
+                break
+            except Exception as e:
+                print(f"❌ Error: {e}")
+                continue
