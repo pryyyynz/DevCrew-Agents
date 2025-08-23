@@ -124,9 +124,13 @@ class AgentOrchestrator:
     def _load_model_mapping(self) -> Dict[str, str]:
         """Load model assignments for each agent type."""
         return {
-            'project_manager': os.getenv('PROJECT_MANAGER_MODEL', 'groq/llama-3.1-8b-instant'),
-            'designer': os.getenv('DESIGNER_MODEL', 'groq/llama-3.1-8b-instant'),
+            # Project Manager: Needs strategic thinking and coordination
+            'project_manager': os.getenv('PROJECT_MANAGER_MODEL', 'groq/llama-3.3-70b-versatile'),
+            # Designer: Benefits from creative and analytical thinking
+            'designer': os.getenv('DESIGNER_MODEL', 'groq/llama-3.1-70b-versatile'),
+            # Coder: Needs deep technical reasoning and code generation
             'coder': os.getenv('CODER_MODEL', 'groq/deepseek-r1-distill-llama-70b'),
+            # Tester: Requires systematic and thorough analysis
             'tester': os.getenv('TESTER_MODEL', 'groq/llama-3.3-70b-versatile')
         }
 
@@ -161,7 +165,7 @@ class AgentOrchestrator:
                     f"Failed to initialize {agent_type}: {str(e)}")
 
     def _get_tools_for_agent(self, agent_type: str) -> List:
-        """Get tools for a specific agent type."""
+        """Get tools for a specific agent type optimized for DevCrew coordination."""
         from tools.custom_tool import (
             RequirementsClarifierTool, ArchitectureReviewerTool, TaskManagerTool,
             TaskAssignmentTool, KnowledgeBaseSearchTool, SummarizerTool,
@@ -170,43 +174,61 @@ class AgentOrchestrator:
             PackageInstallerTool, SearchDocsTool, UnitTestRunnerTool,
             TestCaseGeneratorTool, BugLoggerTool, SandboxCodeTool
         )
+        from communication.communication_tools import (
+            SharedMemoryTool, MessagePassingTool, KnowledgeStoreTool, TeamCommunicationTool
+        )
 
-        common = [RequirementsClarifierTool()]
+        # Core communication tools for all agents
+        communication_tools = [
+            SharedMemoryTool(),
+            MessagePassingTool(), 
+            KnowledgeStoreTool(),
+            TeamCommunicationTool()
+        ]
 
-        if (agent_type == "project_manager"):
-            return common + [
+        # Common tools for basic functionality
+        common_tools = [RequirementsClarifierTool()] + communication_tools
+
+        if agent_type == "project_manager":
+            return common_tools + [
                 ArchitectureReviewerTool(),
                 TaskManagerTool(),
-                TaskAssignmentTool(),  # New tool for creating tasks
+                TaskAssignmentTool(),  # Critical for task delegation
                 KnowledgeBaseSearchTool(),
-                SummarizerTool()
+                SummarizerTool(),
+                ReadFileTool(),  # For reviewing project artifacts
             ]
-        elif (agent_type == "designer"):
-            return common + [
+        elif agent_type == "designer":
+            return common_tools + [
+                DesignSystemGeneratorTool(),
                 ArchitectureReviewerTool(),
                 ArchitectureDocGeneratorTool(),
-                DesignSystemGeneratorTool(),
-                CritiqueTool()
+                CritiqueTool(),
+                ReadFileTool(),  # For reviewing design specs
+                WriteFileTool()  # For creating design documentation
             ]
-        elif (agent_type == "coder"):
-            return common + [
+        elif agent_type == "coder":
+            return common_tools + [
                 WriteFileTool(),
                 ReadFileTool(),
                 CodeExecutionTool(),
                 CodeQualityAnalyzerTool(),
                 PackageInstallerTool(),
                 SearchDocsTool(),
-                SandboxCodeTool()  # Add the new sandbox code tool
+                SandboxCodeTool(),  # Critical for prototyping
+                ArchitectureReviewerTool()
             ]
-        elif (agent_type == "tester"):
-            return common + [
-                ReadFileTool(),
-                UnitTestRunnerTool(),
+        elif agent_type == "tester":
+            return common_tools + [
                 TestCaseGeneratorTool(),
-                BugLoggerTool()
+                UnitTestRunnerTool(),
+                CodeQualityAnalyzerTool(),
+                BugLoggerTool(),
+                ReadFileTool(),  # For reviewing code and specs
+                WriteFileTool()  # For test documentation
             ]
 
-        return common
+        return common_tools
 
     def _initialize_completion_criteria(self):
         """Initialize project completion criteria for each phase."""
