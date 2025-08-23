@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevCrew Agents - Web Interface</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">
+                    <i class="fas fa-robot"></i>
+                    <span>DevCrew Agents</span>
+                </div>
+                <div class="status-indicator" id="connectionStatus">
+                    <span class="status-dot offline"></span>
+                    <span class="status-text">Connecting...</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="project-phase" id="projectPhase">
+                    <i class="fas fa-project-diagram"></i>
+                    <span>Phase: <strong id="currentPhase">Initialization</strong></span>
+                    <div class="phase-progress" id="phaseProgress">
+                        <div class="progress-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="header-right">
+                <div class="agent-status" id="agentStatus">
+                    <i class="fas fa-users"></i>
+                    <span id="activeAgent">No active agent</span>
+                </div>
+                <button class="header-btn" id="settingsBtn" title="Settings">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Left Panel - Conversation Log -->
+            <aside class="left-panel">
+                <div class="panel-header">
+                    <h3><i class="fas fa-comments"></i> Conversation Log</h3>
+                    <button class="btn-small" id="clearChatBtn" title="Clear Chat">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+                <div class="conversation-container" id="conversationContainer">
+                    <div class="welcome-message">
+                        <div class="agent-avatar system">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-content">
+                            <div class="message-header">
+                                <span class="agent-name">System</span>
+                                <span class="message-time" id="systemTime"></span>
+                            </div>
+                            <div class="message-text">
+                                Welcome to DevCrew Agents! I'm your AI development team ready to help with your projects. 
+                                You can ask me about project planning, design, coding, testing, or any development-related questions.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chat Input -->
+                <div class="chat-input-container">
+                    <form id="chatForm" class="chat-form">
+                        <div class="input-group">
+                            <textarea 
+                                id="messageInput" 
+                                placeholder="Ask your dev team anything..." 
+                                rows="3"
+                                maxlength="2000"
+                            ></textarea>
+                            <button type="submit" id="sendBtn" class="send-btn" title="Send Message">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        <div class="input-footer">
+                            <span class="char-counter">0 / 2000</span>
+                            <div class="quick-actions">
+                                <button type="button" class="quick-btn" data-message="What's the project status?">
+                                    <i class="fas fa-chart-line"></i> Status
+                                </button>
+                                <button type="button" class="quick-btn" data-message="Create a new project plan">
+                                    <i class="fas fa-project-diagram"></i> Plan
+                                </button>
+                                <button type="button" class="quick-btn" data-message="Review the current design">
+                                    <i class="fas fa-palette"></i> Design
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </aside>
+
+            <!-- Center Panel - Main Content -->
+            <section class="center-panel">
+                <!-- Tabs -->
+                <div class="tab-container">
+                    <button class="tab active" data-tab="overview">
+                        <i class="fas fa-eye"></i> Preview
+                    </button>
+                    <button class="tab" data-tab="agents">
+                        <i class="fas fa-users"></i> Agents
+                    </button>
+                    <button class="tab" data-tab="tasks">
+                        <i class="fas fa-tasks"></i> Tasks
+                    </button>
+                    <button class="tab" data-tab="architecture">
+                        <i class="fas fa-sitemap"></i> Architecture
+                    </button>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Preview Tab -->
+                    <div class="tab-pane active" id="overview">
+                        <div class="preview-container">
+                            <!-- Editor Section -->
+                            <div class="editor-section">
+                                <div class="editor-header">
+                                    <div class="editor-title">
+                                        <i class="fas fa-code"></i>
+                                        <span>Code Editor</span>
+                                    </div>
+                                    <div class="editor-controls">
+                                        <div class="language-tabs">
+                                            <button class="lang-tab active" data-lang="python" title="Python">
+                                                <i class="fab fa-python"></i>
+                                            </button>
+                                            <button class="lang-tab" data-lang="javascript" title="JavaScript">
+                                                <i class="fab fa-js"></i>
+                                            </button>
+                                            <button class="lang-tab" data-lang="html" title="HTML">
+                                                <i class="fab fa-html5"></i>
+                                            </button>
+                                        </div>
+                                        <div class="editor-actions">
+                                            <button class="btn-action secondary" id="clearSandboxBtn" title="Clear Editor">
+                                                <i class="fas fa-broom"></i>
+                                                <span>Clear</span>
+                                            </button>
+                                            <button class="btn-action primary" id="runCodeBtn" title="Run Code">
+                                                <i class="fas fa-play"></i>
+                                                <span>Run</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="editor-content">
+                                    <textarea 
+                                        id="sandboxEditor" 
+                                        placeholder="Write your code here..."
+                                        spellcheck="false"
+                                    ># Welcome to DevCrew Code Sandbox!
+# You can write and execute Python code here
+
+print("Hello, DevCrew! 🚀")
+
+# Try some calculations
+x = 42
+y = 8
+result = x + y
+print(f"The answer is: {result}")
+
+# Import libraries
+import datetime
+print(f"Current time: {datetime.datetime.now()}")
+
+# Your code here...</textarea>
+                                </div>
+                            </div>
+
+                            <!-- Output Section -->
+                            <div class="output-section">
+                                <div class="output-header">
+                                    <div class="output-title">
+                                        <i class="fas fa-terminal"></i>
+                                        <span>Output</span>
+                                    </div>
+                                    <div class="output-controls">
+                                        <button class="btn-icon" id="clearOutputBtn" title="Clear Output">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        <button class="btn-icon" id="maximizeSandboxBtn" title="Open in New Tab">
+                                            <i class="fas fa-external-link-alt"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="output-content" id="sandboxOutput">
+                                    <div class="output-placeholder">
+                                        <div class="placeholder-icon">
+                                            <i class="fas fa-play-circle"></i>
+                                        </div>
+                                        <div class="placeholder-text">
+                                            <h4>Ready to Execute</h4>
+                                            <p>Click the <strong>Run</strong> button or press <kbd>Ctrl + Enter</kbd> to execute your code</p>
+                                            <div class="execution-tips">
+                                                <div class="tip">
+                                                    <i class="fas fa-lightbulb"></i>
+                                                    <span>Supports Python, JavaScript, and HTML</span>
+                                                </div>
+                                                <div class="tip">
+                                                    <i class="fas fa-clock"></i>
+                                                    <span>30-second execution timeout</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agents Tab -->
+                    <div class="tab-pane" id="agents">
+                        <div class="agents-grid" id="agentsGrid">
+                            <!-- Agent cards will be populated by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Tasks Tab -->
+                    <div class="tab-pane" id="tasks">
+                        <div class="tasks-container">
+                            <div class="tasks-header">
+                                <h4><i class="fas fa-tasks"></i> Recent Tasks</h4>
+                                <button class="btn-small" id="refreshTasksBtn">
+                                    <i class="fas fa-sync"></i> Refresh
+                                </button>
+                            </div>
+                            <div class="tasks-list" id="tasksList">
+                                <!-- Tasks will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Architecture Tab -->
+                    <div class="tab-pane" id="architecture">
+                        <div class="architecture-container">
+                            <h4><i class="fas fa-sitemap"></i> System Architecture</h4>
+                            <div class="architecture-diagram" id="architectureDiagram">
+                                <!-- Architecture visualization will be added here -->
+                                <div class="placeholder">
+                                    <i class="fas fa-sitemap"></i>
+                                    <p>Architecture diagram will be displayed here</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Panel - Files and Logs -->
+            <aside class="right-panel">
+                <div class="right-panel-tabs">
+                    <button class="right-tab active" data-tab="files">
+                        <i class="fas fa-folder"></i> Files
+                    </button>
+                    <button class="right-tab" data-tab="logs">
+                        <i class="fas fa-terminal"></i> Logs
+                    </button>
+                </div>
+
+                <!-- Files Tab -->
+                <div class="right-tab-content active" id="files">
+                    <div class="files-header">
+                        <h4>Project Files</h4>
+                        <button class="btn-small" id="refreshFilesBtn">
+                            <i class="fas fa-sync"></i>
+                        </button>
+                    </div>
+                    <div class="files-list" id="filesList">
+                        <!-- Files will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Logs Tab -->
+                <div class="right-tab-content" id="logs">
+                    <div class="logs-header">
+                        <h4>System Logs</h4>
+                        <button class="btn-small" id="clearLogsBtn">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                    <div class="logs-container" id="logsContainer">
+                        <!-- Logs will be populated by JavaScript -->
+                    </div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- File Viewer Modal -->
+    <div class="modal" id="fileModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 id="fileModalTitle">File Viewer</h4>
+                <button class="modal-close" id="fileModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <pre><code id="fileModalContent" class="language-python"></code></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
