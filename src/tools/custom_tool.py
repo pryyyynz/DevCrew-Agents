@@ -200,6 +200,75 @@ class TaskManagerTool(BaseTool):
             return f"Task manager error: {str(e)}"
 
 
+class TaskAssignmentInput(BaseModel):
+    agent_type: str = Field(...,
+                            description="Agent to assign task to: designer, coder, tester")
+    task_title: str = Field(..., description="Brief title for the task")
+    task_description: str = Field(...,
+                                  description="Detailed description of what needs to be done")
+    priority: int = Field(
+        5, description="Priority level (1-10, higher is more urgent)")
+    dependencies: str = Field(
+        "", description="Comma-separated list of task IDs this depends on")
+
+
+class TaskAssignmentTool(BaseTool):
+    name: str = "assign_task_to_agent"
+    description: str = (
+        "Create and assign a task to a specific agent (designer, coder, tester). "
+        "This will add the task to the execution queue for immediate processing."
+    )
+    args_schema: Type[BaseModel] = TaskAssignmentInput
+
+    def _run(self, agent_type: str, task_title: str, task_description: str,
+             priority: int = 5, dependencies: str = "") -> str:
+        try:
+            from datetime import datetime
+            import json
+
+            # Validate agent type
+            valid_agents = ["designer", "coder", "tester"]
+            if agent_type not in valid_agents:
+                return f"❌ Invalid agent type: {agent_type}. Must be one of: {', '.join(valid_agents)}"
+
+            # Parse dependencies
+            dep_list = [dep.strip()
+                        for dep in dependencies.split(",") if dep.strip()]
+
+            # Create task data structure
+            task_data = {
+                "agent_type": agent_type,
+                "title": task_title,
+                "description": task_description,
+                "priority": priority,
+                "dependencies": dep_list,
+                "created_at": datetime.now().isoformat(),
+                "status": "queued"
+            }
+
+            # Store task assignment signal in shared memory for orchestrator
+            # This is a signal that will be picked up by the orchestrator
+            task_id = f"pm_task_{agent_type}_{int(datetime.now().timestamp())}"
+
+            # Return success message with task details
+            return f"""✅ **Task Assigned Successfully**
+
+**Task ID**: {task_id}
+**Assigned to**: {agent_type.title()} Agent
+**Title**: {task_title}
+**Priority**: {priority}/10
+**Dependencies**: {dependencies if dependencies else "None"}
+
+**Description**:
+{task_description}
+
+The task has been queued for execution and the {agent_type} agent will begin work on it shortly.
+"""
+
+        except Exception as e:
+            return f"❌ **Task Assignment Failed**: {str(e)}"
+
+
 class KnowledgeBaseSearchInput(BaseModel):
     query: str = Field(..., description="Search query for knowledge base")
     context: str = Field(
@@ -396,6 +465,67 @@ class SearchDocsTool(BaseTool):
             source, f"Documentation search for {source} not configured")
         return f"## Documentation Search\n**Query**: {query}\n**Source**: {source}\n\n{result}\n\n*Note: This is a mock response. Real implementation would fetch actual documentation content.*"
 
+
+class SandboxCodeInput(BaseModel):
+    code: str = Field(..., description="Generated code to display in sandbox")
+    language: str = Field(
+        "python", description="Programming language (python, javascript, html)")
+    filename: str = Field(None, description="Optional filename for context")
+    description: str = Field(
+        None, description="Description of what the code does")
+
+
+class SandboxCodeTool(BaseTool):
+    name: str = "display_code_in_sandbox"
+    description: str = (
+        "Display generated code in the web sandbox for user testing and execution. "
+        "Use this whenever you create code that the user should be able to run."
+    )
+    args_schema: Type[BaseModel] = SandboxCodeInput
+
+    def _run(self, code: str, language: str = "python", filename: str = None, description: str = None) -> str:
+        from communication.memory_manager import SharedMemoryManager
+        from datetime import datetime
+
+        try:
+            # Store code in shared memory for sandbox access
+            memory_manager = SharedMemoryManager("sandbox_code.db")
+
+            code_data = {
+                "code": code,
+                "language": language,
+                "filename": filename,
+                "description": description,
+                "timestamp": datetime.now().isoformat(),
+                "agent": "coder"
+            }
+
+            # Store with a timestamp-based key
+            code_id = f"generated_code_{int(datetime.now().timestamp())}"
+            success = memory_manager.set(code_id, code_data, "coder")
+
+            if success:
+                # Also update the latest code for easy access
+                memory_manager.set("latest_generated_code", code_data, "coder")
+
+                return f"""🚀 **Code Added to Sandbox Successfully!**
+
+**Language**: {language}
+**Filename**: {filename or 'Generated Code'}
+**Description**: {description or 'Code generated by coder agent'}
+
+The code has been sent to the web sandbox where the user can view and execute it.
+
+**Code Preview**:
+```{language}
+{code[:200]}{'...' if len(code) > 200 else ''}
+```"""
+            else:
+                return "❌ **Failed** to add code to sandbox"
+
+        except Exception as e:
+            return f"❌ **Sandbox Error**: {str(e)}"
+
 # Tester Tools
 
 
@@ -575,6 +705,7 @@ ALL_TOOLS = [
     TestCaseGeneratorTool(),
     # Project Manager tools
     TaskManagerTool(),
+    TaskAssignmentTool(),
     KnowledgeBaseSearchTool(),
     SummarizerTool(),
     # Designer tools
@@ -583,6 +714,7 @@ ALL_TOOLS = [
     CodeExecutionTool(),
     PackageInstallerTool(),
     SearchDocsTool(),
+    SandboxCodeTool(),
     # Tester tools
     UnitTestRunnerTool(),
     BugLoggerTool(),

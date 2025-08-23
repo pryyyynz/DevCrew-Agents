@@ -19,6 +19,7 @@ from tools import (
     CodeExecutionTool,
     PackageInstallerTool,
     SearchDocsTool,
+    SandboxCodeTool,
     # Tester tools
     UnitTestRunnerTool,
     BugLoggerTool,
@@ -103,6 +104,7 @@ class DevcrewAgents():
             CodeExecutionTool(),
             PackageInstallerTool(),
             SearchDocsTool(),
+            SandboxCodeTool(),  # Add the new sandbox code tool
             # Communication tools
             SharedMemoryTool(),
             MessagePassingTool(),
