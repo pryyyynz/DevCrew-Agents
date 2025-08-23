@@ -210,10 +210,10 @@ class AgentLoop:
     def _build_reasoning_prompt(self, task: Dict[str, Any]) -> str:
         """Build the initial reasoning prompt for the agent."""
         context = self._gather_context()
-        
+
         # Agent-specific reasoning approaches
         agent_specific_guidance = self._get_agent_specific_guidance()
-        
+
         prompt = f"""
 You are {self.agent_id.replace('_', ' ').title()} in a multi-agent DevCrew system working on the following task:
 {json.dumps(task, indent=2)}
@@ -293,7 +293,8 @@ Remember: You are the quality guardian for the entire development process.
         # Get recent team messages
         messages = self.message_bus.get_messages(self.agent_id, limit=5)
         if messages:
-            context_parts.append(f"Recent team messages: {len(messages)} items")
+            context_parts.append(
+                f"Recent team messages: {len(messages)} items")
             # Add summary of recent important messages
             recent_topics = []
             for msg in messages[-3:]:  # Last 3 messages
@@ -306,15 +307,18 @@ Remember: You are the quality guardian for the entire development process.
         # Get shared project memory
         memory_keys = self.memory.list_keys()
         if memory_keys:
-            project_keys = [k for k in memory_keys[:15] if not k.startswith('temp_')]
+            project_keys = [k for k in memory_keys[:15]
+                            if not k.startswith('temp_')]
             if project_keys:
-                context_parts.append(f"Available project memory: {', '.join(project_keys)}")
+                context_parts.append(
+                    f"Available project memory: {', '.join(project_keys)}")
 
         # Get team knowledge if available
         if self.knowledge:
             stats = self.knowledge.get_stats()
             if stats.get('total_knowledge_items', 0) > 0:
-                context_parts.append(f"Team knowledge base: {stats['total_knowledge_items']} items")
+                context_parts.append(
+                    f"Team knowledge base: {stats['total_knowledge_items']} items")
 
         return "; ".join(context_parts) if context_parts else "Starting fresh - no previous context"
 

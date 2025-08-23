@@ -87,7 +87,7 @@ class DevcrewAgents():
             CritiqueTool(),
             RequirementsClarifierTool(),
             ReadFileTool(),  # For reviewing requirements and specs
-            WriteFileTool(), # For creating design documentation
+            WriteFileTool(),  # For creating design documentation
             # Communication tools for team coordination
             SharedMemoryTool(),
             MessagePassingTool(),
@@ -138,7 +138,7 @@ class DevcrewAgents():
             UnitTestRunnerTool(),
             BugLoggerTool(),
             ReadFileTool(),  # For reviewing code and specifications
-            WriteFileTool(), # For creating test documentation
+            WriteFileTool(),  # For creating test documentation
             RequirementsClarifierTool(),
             # Communication tools for quality feedback
             SharedMemoryTool(),

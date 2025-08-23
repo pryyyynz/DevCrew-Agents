@@ -181,7 +181,7 @@ class AgentOrchestrator:
         # Core communication tools for all agents
         communication_tools = [
             SharedMemoryTool(),
-            MessagePassingTool(), 
+            MessagePassingTool(),
             KnowledgeStoreTool(),
             TeamCommunicationTool()
         ]
