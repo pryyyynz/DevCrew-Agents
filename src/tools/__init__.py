@@ -9,6 +9,7 @@ from .custom_tool import (
     TestCaseGeneratorTool,
     # Project Manager tools
     TaskManagerTool,
+    TaskAssignmentTool,  # Add the missing export
     KnowledgeBaseSearchTool,
     SummarizerTool,
     # Designer tools
@@ -44,6 +45,7 @@ __all__ = [
     'CodeQualityAnalyzerTool',
     'TestCaseGeneratorTool',
     'TaskManagerTool',
+    'TaskAssignmentTool',  # Add to exports
     'KnowledgeBaseSearchTool',
     'SummarizerTool',
     'CritiqueTool',

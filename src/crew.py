@@ -11,6 +11,7 @@ from tools import (
     TestCaseGeneratorTool,
     # Project Manager tools
     TaskManagerTool,
+    TaskAssignmentTool,  # Add the missing import
     KnowledgeBaseSearchTool,
     SummarizerTool,
     # Designer tools
@@ -58,19 +59,23 @@ class DevcrewAgents():
             RequirementsClarifierTool(),
             ArchitectureReviewerTool(),
             TaskManagerTool(),
+            TaskAssignmentTool(),  # Critical for dynamic task creation
             KnowledgeBaseSearchTool(),
             SummarizerTool(),
-            # Communication tools
+            ReadFileTool(),  # For reviewing artifacts
+            # Communication tools - essential for orchestration
             SharedMemoryTool(),
             MessagePassingTool(),
             KnowledgeStoreTool(),
             TeamCommunicationTool(),
         ]
         return Agent(
-            # type: ignore[index]
             config=self.agents_config['project_manager'],
             tools=project_manager_tools,
-            verbose=True
+            verbose=True,
+            allow_delegation=True,  # Enable task delegation
+            memory=True,            # Enable persistent memory
+            max_iter=5,            # Allow multiple iterations
         )
 
     @agent
@@ -80,17 +85,22 @@ class DevcrewAgents():
             ArchitectureReviewerTool(),
             ArchitectureDocGeneratorTool(),
             CritiqueTool(),
-            RequirementsClarifierTool(),  # To understand requirements for design
-            # Communication tools
+            RequirementsClarifierTool(),
+            ReadFileTool(),  # For reviewing requirements and specs
+            WriteFileTool(),  # For creating design documentation
+            # Communication tools for team coordination
             SharedMemoryTool(),
             MessagePassingTool(),
             KnowledgeStoreTool(),
             TeamCommunicationTool(),
         ]
         return Agent(
-            config=self.agents_config['designer'],  # type: ignore[index]
+            config=self.agents_config['designer'],
             tools=designer_tools,
-            verbose=True
+            verbose=True,
+            allow_delegation=False,
+            memory=True,
+            max_iter=4,
         )
 
     @agent
@@ -104,17 +114,20 @@ class DevcrewAgents():
             CodeExecutionTool(),
             PackageInstallerTool(),
             SearchDocsTool(),
-            SandboxCodeTool(),  # Add the new sandbox code tool
-            # Communication tools
+            SandboxCodeTool(),  # Critical for prototyping and testing
+            # Communication tools for coordination
             SharedMemoryTool(),
             MessagePassingTool(),
             KnowledgeStoreTool(),
             TeamCommunicationTool(),
         ]
         return Agent(
-            config=self.agents_config['coder'],  # type: ignore[index]
+            config=self.agents_config['coder'],
             tools=coder_tools,
-            verbose=True
+            verbose=True,
+            allow_delegation=False,
+            memory=True,
+            max_iter=6,  # Allow more iterations for complex coding tasks
         )
 
     @agent
@@ -124,17 +137,22 @@ class DevcrewAgents():
             CodeQualityAnalyzerTool(),
             UnitTestRunnerTool(),
             BugLoggerTool(),
-            ReadFileTool(),
-            # Communication tools
+            ReadFileTool(),  # For reviewing code and specifications
+            WriteFileTool(),  # For creating test documentation
+            RequirementsClarifierTool(),
+            # Communication tools for quality feedback
             SharedMemoryTool(),
             MessagePassingTool(),
             KnowledgeStoreTool(),
             TeamCommunicationTool(),
         ]
         return Agent(
-            config=self.agents_config['tester'],  # type: ignore[index]
+            config=self.agents_config['tester'],
             tools=tester_tools,
-            verbose=True
+            verbose=True,
+            allow_delegation=False,
+            memory=True,
+            max_iter=4,
         )
 
     # Tasks reflecting a typical dev lifecycle

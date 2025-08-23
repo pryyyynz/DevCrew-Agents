@@ -1,43 +1,74 @@
 planning_task:
   description: >
-    Create a concise project initiation & planning brief for {project_name} targeting {target_user}.
-    Include: refined problem statement, user personas, primary & secondary use cases, key success metrics,
-    prioritized feature list (Must / Should / Could / Won't this release), high-level architecture outline
-    referencing {tech_stack}, major risks & mitigations, and iteration roadmap (3 milestones).
+    As Project Manager, orchestrate the complete project planning phase for {project_name}. Create a comprehensive 
+    project initiation brief, coordinate with team members through communication tools, and establish the foundation 
+    for effective team collaboration. Include: refined problem statement with stakeholder analysis, detailed user personas 
+    for {target_user}, comprehensive use case mapping with user journeys, measurable success metrics and KPIs, 
+    prioritized feature roadmap (MoSCoW method), high-level technical architecture aligned with {tech_stack}, 
+    risk assessment with mitigation strategies, team communication protocols, and milestone-based delivery timeline.
+    Use task assignment tools to delegate research tasks to specialists and consolidate findings.
   expected_output: >
-    A markdown file with sections: 1. Overview 2. Refined Problem 3. Personas 4. Use Cases 5. Success Metrics
-    6. Prioritized Features Table 7. Architecture Outline 8. Risks & Mitigations 9. Milestone Roadmap.
+    A comprehensive markdown project brief with sections: 1. Executive Summary 2. Problem Definition & Stakeholder Analysis 
+    3. User Personas & Journey Maps 4. Detailed Use Cases with Acceptance Criteria 5. Success Metrics & KPIs 
+    6. Feature Prioritization Matrix (MoSCoW) 7. Technical Architecture Overview 8. Team Communication Plan 
+    9. Risk Register & Mitigation Strategies 10. Milestone Roadmap with Dependencies 11. Quality Gates & Review Process.
+    Include team coordination summaries and task delegation records from communication tools.
   agent: project_manager
 
 design_task:
   description: >
-    Using the planning brief, produce detailed UX & system design artifacts for {project_name} applying
-    {design_principles}. Provide: information architecture, user journey for primary persona, screen / page map,
-    component inventory (name, purpose, props/state), data model (ER or entity list with relationships),
-    API surface (endpoint table with method, path, purpose, request schema, response schema), and design tokens
-    (color, spacing scale, typography, radius, elevation) optimized for accessibility.
+    Working closely with the Project Manager, create a comprehensive design system and user experience architecture 
+    for {project_name} that embodies {design_principles} and serves {target_user} effectively. Collaborate through 
+    team communication tools to ensure alignment with technical constraints and project requirements. Deliverables include: 
+    complete information architecture with content strategy, detailed user journey flows with interaction patterns, 
+    comprehensive screen/component map with responsive layouts, detailed component inventory with design specifications, 
+    robust data model design with entity relationships, complete API surface design with endpoint specifications, 
+    accessibility-first design tokens (typography, color systems, spacing, elevation), and detailed design-to-development 
+    handoff documentation. Use shared memory to maintain design consistency and communicate decisions to the team.
   expected_output: >
-    A markdown design document with sections: 1. IA 2. User Journey 3. Screen Map 4. Component Inventory
-    5. Data Model 6. API Endpoints 7. Design Tokens 8. Accessibility Notes.
+    A comprehensive design specification document with sections: 1. Design System Overview & Principles 2. Information 
+    Architecture & Navigation 3. User Journey Maps & Interaction Flows 4. Responsive Screen Map & Layout Grid 
+    5. Component Library with Design Specifications 6. Data Model & Entity Relationships 7. API Design & Endpoint Schema 
+    8. Accessibility-First Design Tokens 9. Design-Development Handoff Guide 10. Usability Testing Plan 11. Design QA Checklist.
+    Include communication logs showing coordination with PM and technical team, plus design rationale documentation.
   agent: designer
 
 implementation_task:
   description: >
-    Convert the design into an implementation plan focused on {tech_stack}. Provide repository structure,
-    module responsibility map, coding standards, dependency decisions, sequence of implementation steps, CI/CD outline,
-    and sample skeleton code snippets for critical modules (API router, data model, service layer, test example).
-    Ensure alignment with design_system and architecture decisions.
+    Transform design specifications into a comprehensive technical implementation plan for {tech_stack}, working 
+    collaboratively with the Project Manager and Designer through team communication channels. Create detailed 
+    technical architecture, establish development standards, and provide implementation guidance that ensures code 
+    quality, security, and maintainability. Deliverables include: complete repository structure with development workflow, 
+    detailed module architecture with responsibility mapping, comprehensive coding standards and best practices, 
+    dependency management and security analysis, step-by-step implementation sequence with milestone gates, 
+    CI/CD pipeline design with quality gates, production-ready code examples and templates, performance optimization 
+    strategy, security implementation plan, and comprehensive technical documentation. Use sandbox tools for 
+    prototyping and validation, and coordinate technical decisions through team communication.
   expected_output: >
-    A markdown implementation plan with sections: 1. Repo Structure 2. Module Map 3. Coding Standards 4. Dependencies
-    5. Implementation Steps 6. CI/CD Workflow 7. Skeleton Code Snippets 8. Performance & Observability Hooks.
+    A detailed technical implementation guide with sections: 1. System Architecture & Technology Decisions 
+    2. Repository Structure & Development Workflow 3. Module Architecture & Dependency Graph 4. Coding Standards 
+    & Best Practices 5. Security Implementation Plan 6. Database Design & Migration Strategy 7. API Implementation 
+    Guide with Authentication 8. Frontend Architecture & State Management 9. CI/CD Pipeline Configuration 
+    10. Performance Optimization Strategy 11. Deployment Architecture & Scaling Plan 12. Technical Documentation Standards.
+    Include code examples, architectural diagrams, and team coordination records from communication tools.
   agent: coder
 
 testing_task:
   description: >
-    Produce a comprehensive test strategy derived from the implementation plan. Include test pyramid allocation,
-    risk-based prioritization matrix, test data strategy, critical path scenarios, edge & negative cases, non-functional
-    tests (performance, security, accessibility), and automation plan (what, how, when integrated in pipeline).
+    Develop a comprehensive quality assurance strategy for {project_name} that ensures reliability, security, and 
+    user satisfaction while coordinating closely with the development team through communication tools. Create a 
+    multi-layered testing approach that covers all aspects of the application lifecycle and establishes quality 
+    gates aligned with {design_principles}. Deliverables include: comprehensive test strategy with coverage analysis, 
+    detailed test pyramid implementation (unit, integration, E2E), risk-based test prioritization matrix, 
+    comprehensive test data management strategy, automated testing framework design, performance and security testing plans, 
+    accessibility testing protocols, user acceptance testing procedures, continuous testing integration with CI/CD, 
+    quality metrics and reporting dashboard design, and test environment management strategy. Coordinate with team 
+    members to establish quality standards and testing protocols.
   expected_output: >
-    A markdown report with sections: 1. Strategy Overview 2. Risk Matrix 3. Test Coverage by Layer 4. Test Data Plan
-    5. Critical Scenarios 6. Edge & Negative Cases 7. Non-Functional Tests 8. Automation & Tooling 9. Exit Criteria.
+    A comprehensive QA strategy document with sections: 1. Testing Strategy Overview & Quality Goals 2. Test Pyramid 
+    Architecture & Coverage Plan 3. Risk-Based Prioritization Matrix 4. Test Data Strategy & Management 5. Automated 
+    Testing Framework Design 6. Performance Testing Plan & Load Scenarios 7. Security Testing Protocol & Vulnerability Assessment 
+    8. Accessibility Testing Checklist & WCAG Compliance 9. User Acceptance Testing Process 10. CI/CD Integration & Quality Gates 
+    11. Quality Metrics Dashboard & Reporting 12. Test Environment Strategy & Data Management 13. Bug Triage & Resolution Workflow.
+    Include team coordination records, quality standards documentation, and testing tool recommendations with implementation guides.
   agent: tester

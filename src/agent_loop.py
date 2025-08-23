@@ -125,12 +125,12 @@ class AgentLoop:
     def _get_agent_temperature(self) -> float:
         """Get temperature setting based on agent type."""
         temperature_map = {
-            "project_manager": 0.2,
-            "designer": 0.4,
-            "coder": 0.3,
-            "tester": 0.25
+            "project_manager": 0.1,  # Very focused and decisive
+            "designer": 0.3,         # Creative but structured
+            "coder": 0.2,            # Precise but flexible
+            "tester": 0.15           # Methodical and thorough
         }
-        return temperature_map.get(self.agent_id, 0.3)
+        return temperature_map.get(self.agent_id, 0.25)
 
     def _setup_logging(self) -> logging.Logger:
         """Setup agent-specific logging."""
@@ -211,22 +211,27 @@ class AgentLoop:
         """Build the initial reasoning prompt for the agent."""
         context = self._gather_context()
 
+        # Agent-specific reasoning approaches
+        agent_specific_guidance = self._get_agent_specific_guidance()
+
         prompt = f"""
-You are {self.agent_id} working on the following task:
+You are {self.agent_id.replace('_', ' ').title()} in a multi-agent DevCrew system working on the following task:
 {json.dumps(task, indent=2)}
 
 Current Context:
 {context}
 
-Your role is to reason through this task step by step:
-1. Understand what needs to be done
-2. Identify available resources and tools
-3. Plan the sequence of actions
-4. Consider potential obstacles and alternatives
-5. Make a decision on the best approach
+{agent_specific_guidance}
+
+Your role in this coordinated workflow is to reason through this task systematically:
+1. Understand the task within the broader project context
+2. Identify team coordination opportunities and dependencies
+3. Plan your approach using available tools and communication channels
+4. Consider how your output will integrate with other agents' work
+5. Determine if you need to coordinate with other team members
 
 Think step by step and provide your reasoning in the following format:
-THOUGHT: [Your current thinking]
+THOUGHT: [Your current thinking about the task and team coordination]
 CONFIDENCE: [0.0-1.0 confidence level]
 ALTERNATIVES: [Other approaches you considered]
 NEXT_ACTION: [What you plan to do next, or COMPLETE if done reasoning]
@@ -235,29 +240,87 @@ Begin your reasoning:
 """
         return prompt
 
+    def _get_agent_specific_guidance(self) -> str:
+        """Get agent-specific guidance for reasoning."""
+        guidance_map = {
+            "project_manager": """
+As Project Manager, you orchestrate the entire workflow. Focus on:
+- Task coordination and assignment through communication tools
+- Breaking down complex requirements into actionable work items
+- Using task assignment tools to delegate to specialists
+- Maintaining project visibility through status updates
+- Ensuring alignment between technical implementation and business goals
+- Coordinating team communications and resolving blockers
+Remember: You are the primary interface with users and the coordinator of all team activities.
+""",
+            "designer": """
+As Senior Designer, you create user-centered solutions. Focus on:
+- Translating user needs into design specifications
+- Creating comprehensive design systems and component libraries
+- Collaborating with developers through design handoff tools
+- Using shared memory to maintain design consistency
+- Communicating design decisions and rationale to the team
+- Ensuring accessibility and usability in all design choices
+Remember: You bridge user needs with technical implementation through thoughtful design.
+""",
+            "coder": """
+As Senior Engineer, you implement robust technical solutions. Focus on:
+- Translating design specifications into clean, maintainable code
+- Using sandbox tools for rapid prototyping and validation
+- Establishing coding standards and architectural patterns
+- Coordinating technical decisions with the team
+- Creating production-ready implementations with proper testing
+- Documenting technical decisions and architectural choices
+Remember: You ensure technical excellence while maintaining team coordination.
+""",
+            "tester": """
+As QA Lead, you ensure comprehensive quality assurance. Focus on:
+- Creating comprehensive testing strategies and automation
+- Establishing quality gates and testing protocols
+- Coordinating with developers on testing standards
+- Using communication tools to provide quality feedback
+- Ensuring user experience quality and accessibility compliance
+- Creating testing documentation and procedures
+Remember: You are the quality guardian for the entire development process.
+"""
+        }
+        return guidance_map.get(self.agent_id, "Focus on your specialized expertise while coordinating effectively with the team.")
+
     def _gather_context(self) -> str:
         """Gather relevant context for reasoning."""
         context_parts = []
 
-        # Get recent messages
+        # Get recent team messages
         messages = self.message_bus.get_messages(self.agent_id, limit=5)
         if messages:
-            context_parts.append(f"Recent messages: {len(messages)} items")
+            context_parts.append(
+                f"Recent team messages: {len(messages)} items")
+            # Add summary of recent important messages
+            recent_topics = []
+            for msg in messages[-3:]:  # Last 3 messages
+                if isinstance(msg, dict) and 'content' in msg:
+                    content = str(msg['content'])[:100]
+                    recent_topics.append(f"- {content}...")
+            if recent_topics:
+                context_parts.extend(recent_topics)
 
-        # Get memory keys
+        # Get shared project memory
         memory_keys = self.memory.list_keys()
         if memory_keys:
-            context_parts.append(
-                f"Available memory: {', '.join(memory_keys[:10])}")
+            project_keys = [k for k in memory_keys[:15]
+                            if not k.startswith('temp_')]
+            if project_keys:
+                context_parts.append(
+                    f"Available project memory: {', '.join(project_keys)}")
 
-        # Get knowledge if available
+        # Get team knowledge if available
         if self.knowledge:
             stats = self.knowledge.get_stats()
             if stats.get('total_knowledge_items', 0) > 0:
                 context_parts.append(
-                    f"Knowledge items: {stats['total_knowledge_items']}")
+                    f"Team knowledge base: {stats['total_knowledge_items']} items")
 
-        return "; ".join(context_parts) if context_parts else "No additional context"
+        return "; ".join(context_parts) if context_parts else "Starting fresh - no previous context"
 
     def _parse_reasoning_step(self, step_number: int, response: str) -> ReasoningStep:
         """Parse LLM response into structured reasoning step."""
