@@ -11,6 +11,34 @@ from crew import DevcrewAgents
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
 
+def run_web():
+    """Run the web interface for DevCrew Agents."""
+    print("🌐 Starting DevCrew Agents Web Interface")
+    print("=" * 60)
+
+    try:
+        from web_app import app
+        import uvicorn
+
+        print("🚀 Web interface starting on http://localhost:8000")
+        print("💡 Features:")
+        print("   • Real-time chat with agents")
+        print("   • Project status dashboard")
+        print("   • File viewer and logs")
+        print("   • Agent performance metrics")
+        print("\n🔗 Open your browser to: http://localhost:8000")
+        print("=" * 60)
+
+        uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+
+    except ImportError as e:
+        print(f"❌ Missing web dependencies: {e}")
+        print("💡 Install web dependencies with: pip install fastapi uvicorn jinja2 python-multipart websockets")
+    except Exception as e:
+        print(f"❌ Error starting web interface: {e}")
+        raise
+
+
 def run_interactive_queries():
     """Run interactive query mode - main entry point for user queries."""
     print("🚀 Starting DevCrew Agents Interactive Query Mode")
@@ -288,7 +316,9 @@ def test():
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         command = sys.argv[1]
-        if command == "demo":
+        if command == "web":
+            run_web()
+        elif command == "demo":
             demo_agent_loop()
         elif command == "traditional":
             run_traditional()
@@ -299,7 +329,12 @@ if __name__ == "__main__":
         elif command == "single_query_demo":
             demo_single_query()
         else:
-            print(
-                "Available commands: demo, traditional, agent_loop, interactive, single_query_demo")
+            print("Available commands:")
+            print("  web                - Start web interface")
+            print("  interactive        - Interactive query mode (default)")
+            print("  demo              - Agent loop demonstration")
+            print("  traditional       - Traditional CrewAI system")
+            print("  agent_loop        - Agent loop system demo")
+            print("  single_query_demo - Single query demonstration")
     else:
         run()
